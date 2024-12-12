@@ -1,0 +1,81 @@
+clc;
+fs = 2000;
+f0 = 50;
+Q = 35;
+
+Biceps = load("EMG_Biceps.mat");
+Biceps1 = Biceps.d.samples(1, :);
+Triceps = Biceps.d.samples(2, :);
+Biceps1 = Biceps1(1:end-(0.5*fs));
+Triceps = Triceps(1:end-(0.5*fs));
+
+bw = (f0/(fs/2))/Q;
+[b,a] = iirnotch(f0/(fs/2), bw);
+
+NotchBiceps = filtfilt(b,a,Biceps1);
+NotchTriceps = filtfilt(b,a,Triceps);
+
+Bandpass = fir1(fs,[60,900]/(fs/2));
+Bbiceps = filtfilt(Bandpass,1,NotchBiceps);
+Btriceps = filtfilt(Bandpass,1,NotchTriceps);
+
+brms = envelope(Bbiceps,150,'rms');
+trms = envelope(Btriceps,150,'rms');
+
+t = (0:length(Biceps1)-1)/fs;
+
+
+figure 
+subplot(3,1,1);
+plot(t, Biceps1);
+title('Original EMG Signal Biceps');
+xlabel('Time (Seconds)');
+ylabel('Amplitude (µV)');
+
+subplot(3,1,2);
+plot(t, NotchBiceps);
+title('Applied NotchFiter Biceps');
+xlabel('Time (Seconds)');
+ylabel('Amplitude (µV)');
+
+subplot(3,1,3);
+plot(t , Bbiceps);
+title('Applied Bandpass Filter Biceps');
+xlabel('Time (Seconds)');
+ylabel('Amplitude (µV)');
+
+
+figure
+subplot(3,1,1);
+plot(t, Triceps);
+title('Original EMG Signal Triceps');
+xlabel('Time (Seconds)');
+ylabel('Amplitude (µV)');
+
+subplot(3,1,2);
+plot(t, NotchTriceps);
+title('Applied NotchFiter Triceps');
+xlabel('Time (Seconds)');
+ylabel('Amplitude (µV)');
+
+subplot(3,1,3);
+plot(t , Btriceps);
+title('Applied Bandpass Filter Triceps');
+xlabel('Time (Seconds)');
+ylabel('Amplitude (µV)');
+
+figure
+plot(t , brms);
+hold on
+plot(t , trms);
+hold off;
+title('rms value of Biceps and Triceps');
+xlabel('Time (s)');
+ylabel('Amplitude (µV)');
+legend('Biceps','Triceps');
+grid on
+
+BMax = max(brms);
+TMax = max(trms);
+
+
