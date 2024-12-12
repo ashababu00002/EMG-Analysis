@@ -1,0 +1,241 @@
+clc;
+close all;
+clear all;
+fs = 2000;
+f0 = 50;
+Q = 35;
+
+Punching = load("Punching.mat");
+PunchingTri = Punching.d.samples(32, :);
+PunchingBi = Punching.d.samples(33, :);
+Trigger = Punching.d.samples(35, :);
+PunchingTri = PunchingTri(1:end-(6*fs));
+PunchingBi = PunchingBi(1:end-(6*fs));
+Trigger = Trigger(1:end-(6*fs));
+
+
+bw = (f0/(fs/2))/Q;
+[b,a] = iirnotch(f0/(fs/2), bw);
+
+NotchPunchingTri = filtfilt(b,a,PunchingTri);
+NotchPunchingBi = filtfilt(b,a,PunchingBi);
+
+
+Bandpass = fir1(fs,[60,900]/(fs/2));
+BPunchingTri = filtfilt(Bandpass,1,NotchPunchingTri);
+BPunchingBi = filtfilt(Bandpass,1,NotchPunchingBi);
+
+trms = envelope(BPunchingTri,150,'rms');
+brms = envelope(BPunchingBi,150,'rms');
+
+t = (0:length(PunchingTri)-1)/fs;
+
+
+figure
+subplot(3,1,1);
+plot(t, PunchingTri);
+title('Original EMG Signal Punching Triceps');
+xlabel('Time (Seconds)');
+ylabel('Amplitude (µV)');
+
+subplot(3,1,2);
+plot(t, NotchPunchingTri);
+title('Applied NotchFiter Punching Triceps');
+xlabel('Time (Seconds)');
+ylabel('Amplitude (µV)');
+
+subplot(3,1,3);
+plot(t , BPunchingTri);
+title('Applied Bandpass Filter Punching Triceps');
+xlabel('Time (Seconds)');
+ylabel('Amplitude (µV)');
+
+
+figure 
+subplot(3,1,1);
+plot(t, PunchingBi);
+title('Original EMG Signal Punching Biceps');
+xlabel('Time (Seconds)');
+ylabel('Amplitude (µV)');
+grid on
+
+subplot(3,1,2);
+plot(t, NotchPunchingBi);
+title('Applied NotchFiter Punching Biceps');
+xlabel('Time (Seconds)');
+ylabel('Amplitude (µV)');
+grid on
+
+subplot(3,1,3);
+plot(t , BPunchingBi);
+title('Applied Bandpass Filter Punching Biceps');
+xlabel('Time (Seconds)');
+ylabel('Amplitude (µV)');
+grid on
+
+figure
+subplot(2,1,1);
+plot(t , trms);
+title('rms value of  Punching Triceps');
+xlabel('Time (Seconds)');
+ylabel('Amplitude (µV)'); 
+grid on
+
+subplot(2,1,2);
+plot(t , brms);
+title('rms value of Punching Biceps');
+xlabel('Time (Seconds)');
+ylabel('Amplitude (µV)');
+grid on
+
+Trigger = Trigger - 1026;
+figure
+subplot
+plot(t,trms,'b');
+hold on;
+plot(t,Trigger*400,'r');
+hold off;
+title('RMS with Trigger Punching Triceps');
+xlabel('Time (seconds)');
+ylabel('Amplitude (µV)');
+legend('Punching Triceps rms','Trigger');
+grid on
+
+figure
+subplot
+plot(t,brms,'b');
+hold on;
+plot(t,Trigger*200,'r');
+hold off;
+title('RMS with Trigger Punching Biceps');
+xlabel('Time (seconds)');
+ylabel('Amplitude (µV)');
+legend('Punching Biceps rms','Trigger');
+grid on
+
+Trig = find(Trigger == 1);
+differences = [-20 diff(Trig)];
+TrigPoints = Trig(find(differences>5)+1);
+figure
+subplot
+plot(t,trms);
+hold on
+scatter(t(TrigPoints),trms(TrigPoints),20,'filled','r');
+hold off;
+title('RMS with scattered Trigger Punching Triceps');
+xlabel('Time (s)');
+ylabel('Amplitude (µV)');
+legend('Punching Triceps rms','Trigger');
+grid on
+
+
+figure
+subplot
+plot(t,brms);
+hold on
+scatter(t(TrigPoints),brms(TrigPoints),20,'filled','r');
+hold off;
+title('RMS with scattered Trigger Punching Biceps');
+xlabel('Time (s)');
+ylabel('Amplitude (µV)');
+legend('Punching Triceps rms','Trigger');
+grid on
+
+%%
+figure
+plot(t,trms);
+hold on
+plot(t,brms);
+title('Curls Triceps and Biceps');
+xlabel('Time (s)');
+ylabel('Amplitude (µV)');
+legend('Triceps','Biceps')
+grid on
+
+dt = 1/fs;
+preSecs     = 0.5;
+preSamples  = ceil(preSecs * fs);
+postSecs    = 2;
+postSamples = ceil(postSecs * fs);
+idx = -preSamples:1:postSamples;
+time = idx * dt;
+baselineIdx = time < 0;
+
+Onsets = TrigPoints(1:2:end-2);
+
+for i = (1:length(Onsets))
+    Tmat(i,:) = trms(ceil(Onsets(i) + idx));
+end
+
+TBaselineMat = mean(Tmat(:,1:floor(baselineIdx)),2);
+TcorrectedbaselineMat = Tmat-TBaselineMat;
+TMeanmat = mean(TcorrectedbaselineMat);
+
+
+for i = (1:length(Onsets))
+    Bmat(i,:) = brms(Onsets(i) + idx);
+
+end
+
+BBaselineMat = mean(Bmat(:,1:floor(baselineIdx)),2);
+BcorrectedbaselineMat = Bmat-BBaselineMat;
+BMeanmat = mean(BcorrectedbaselineMat);
+
+figure
+plot(TMeanmat(1,:));
+hold on
+plot(BMeanmat(1,:));
+title('Mean Matrix of Punching Triceps and Biceps');
+xlabel('Time (s)');
+ylabel('Amplitude (µV)');
+legend('Triceps','Biceps')
+grid on
+
+
+for k=(1:size(Tmat,1))
+figure
+plot(time, Tmat(k,:))
+hold on
+plot(time, Bmat(k,:))
+xline(0);
+hold off
+title(sprintf('Triceps and Biceps trigger signal %d', k))
+xlabel('Time (s)');
+ylabel('Amplitude (µV)');
+legend('Triceps','Biceps')
+grid on
+end
+
+figure; imagesc(time,1:8,Tmat);colorbar
+title('Activity of Triceps');
+xline(0);
+xline(1);
+xlabel('Time(s)');
+ylabel('Responses');
+
+figure; imagesc(time,1:8,Bmat);colorbar
+title('Activity of Biceps');
+xline(1);
+xline(2);
+xlabel('Time(s)');
+ylabel('Resposes');
+
+
+
+
+Ttp = (1<time) & (time<2);
+MeanTtp = mean(Tmat(:,Ttp),2);
+Btp = (0<time) & (time<1);
+MeanBtp = mean(Bmat(:,Btp),2);
+%%
+figure
+plot(MeanTtp);
+hold on
+plot(MeanBtp);
+hold off;
+title('Mean of Biceps and triceps');
+xlabel('Responses');
+ylabel('Amplitude (µV)');
+legend('Triceps','Biceps');
+grid on
+
